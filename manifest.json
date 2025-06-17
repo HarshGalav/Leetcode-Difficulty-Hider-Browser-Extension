@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "LeetCode Difficulty Hider",
+  "version": "1.0",
+  "description": "Hide difficulty levels on LeetCode to solve problems without bias",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://leetcode.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://leetcode.com/*"
+      ],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Toggle LeetCode Difficulty"
+  },
+  "icons": {
+    "48": "icon48.png"
+  }
+}

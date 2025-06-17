@@ -1,0 +1,39 @@
+/* CSS for hiding LeetCode difficulties */
+
+/* Force hide elements marked as difficulty-hidden */
+[data-difficulty-hidden="true"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  height: 0 !important;
+  width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Target the exact LeetCode difficulty classes you found */
+.text-sd-easy,
+.text-sd-medium,
+.text-sd-hard {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Target the complete structure */
+p.mx-0[class*="text-sd-"] {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Backup hiding for any element with sd- difficulty classes */
+[class*="text-sd-easy"],
+[class*="text-sd-medium"],
+[class*="text-sd-hard"] {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Additional hiding for common difficulty patterns */
+.leetcode-difficulty-hidden {
+  display: none !important;
+}
