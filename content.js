@@ -42,8 +42,21 @@ class DifficultyHider {
   }
 
   start() {
-    // Initial hide
-    setTimeout(() => this.hideDifficulties(), 500);
+    // Immediately apply current state - no delay for first run
+    if (this.isEnabled) {
+      this.hideDifficulties();
+    } else {
+      this.showDifficulties();
+    }
+    
+    // Also apply after a short delay for dynamic content
+    setTimeout(() => {
+      if (this.isEnabled) {
+        this.hideDifficulties();
+      } else {
+        this.showDifficulties();
+      }
+    }, 100);
     
     // Setup observer for dynamic content
     this.setupObserver();
@@ -66,26 +79,35 @@ class DifficultyHider {
     } else {
       this.showDifficulties();
     }
+    
+    // Force a recheck after toggle
+    setTimeout(() => {
+      if (this.isEnabled) {
+        this.hideDifficulties();
+      }
+    }, 100);
   }
 
   hideDifficulties() {
     if (!this.isEnabled) return;
     
     try {
-      // Method 1: Hide by specific LeetCode classes (most important)
-      this.hideByColorClasses();
+      // Remove any show classes first
+      const showElements = document.querySelectorAll('.leetcode-difficulty-show');
+      showElements.forEach(el => {
+        el.classList.remove('leetcode-difficulty-show');
+        el.style.display = '';
+        el.style.visibility = '';
+      });
       
-      // Method 2: Hide by common difficulty text
-      this.hideByText();
+      // Method 1: Hide exact LeetCode difficulty structure (most specific)
+      this.hideExactLeetCodeStructure();
+      
+      // Method 2: Hide by specific difficulty text in proper context
+      this.hideByDifficultyText();
       
       // Method 3: Hide difficulty columns in tables
       this.hideDifficultyColumns();
-      
-      // Method 4: Advanced selectors for current LeetCode structure
-      this.hideWithAdvancedSelectors();
-      
-      // Method 5: Direct targeting of the exact structure you found
-      this.hideExactLeetCodeStructure();
       
       console.log('Difficulties hidden');
     } catch (error) {
@@ -94,54 +116,104 @@ class DifficultyHider {
   }
 
   hideExactLeetCodeStructure() {
-    // Target the exact HTML structure you provided
+    // Target the exact HTML structure - be very specific
     const exactSelectors = [
-      // Direct class matches
+      // Direct class matches for difficulty elements
       '.text-sd-easy',
       '.text-sd-medium', 
       '.text-sd-hard',
       
-      // More specific matches
+      // More specific matches with context
+      'p.text-sd-easy',
+      'p.text-sd-medium', 
+      'p.text-sd-hard',
+      
+      // Even more specific - the exact structure from your HTML
       'p.mx-0.text-\\[14px\\].text-sd-easy',
       'p.mx-0.text-\\[14px\\].text-sd-medium', 
       'p.mx-0.text-\\[14px\\].text-sd-hard',
-      
-      // Attribute-based selection (safer for dynamic classes)
-      'p[class*="text-sd-easy"]',
-      'p[class*="text-sd-medium"]',
-      'p[class*="text-sd-hard"]',
-      'p[class*="text-sd-"]'
     ];
     
     exactSelectors.forEach(selector => {
       try {
         const elements = document.querySelectorAll(selector);
         elements.forEach(el => {
-          el.style.display = 'none';
-          el.setAttribute('data-difficulty-hidden', 'true');
-          console.log('Hidden exact structure element:', selector, el.textContent);
+          // Double-check this is actually a difficulty element
+          if (this.isDifficultyElement(el)) {
+            el.style.display = 'none';
+            el.setAttribute('data-difficulty-hidden', 'true');
+            console.log('Hidden exact structure element:', selector, el.textContent);
+          }
         });
       } catch (e) {
         console.warn('Could not apply selector:', selector, e);
       }
     });
     
-    // Fallback: Find any p element with these exact classes
+    // Fallback: Find paragraphs with exact difficulty classes
     const allParagraphs = document.querySelectorAll('p');
     allParagraphs.forEach(p => {
       const className = p.className || '';
       if (className.includes('text-sd-easy') || 
           className.includes('text-sd-medium') || 
           className.includes('text-sd-hard')) {
-        p.style.display = 'none';
-        p.setAttribute('data-difficulty-hidden', 'true');
-        console.log('Hidden paragraph with difficulty class:', className, p.textContent);
+        // Verify this is actually a difficulty element
+        if (this.isDifficultyElement(p)) {
+          p.style.display = 'none';
+          p.setAttribute('data-difficulty-hidden', 'true');
+          console.log('Hidden paragraph with difficulty class:', className, p.textContent);
+        }
       }
     });
   }
 
-  hideByText() {
-    // Find all elements containing difficulty text
+  isDifficultyElement(element) {
+    const text = element.textContent.trim().toLowerCase();
+    const className = element.className || '';
+    
+    // Must have sd- difficulty class AND contain only difficulty text
+    const hasDifficultyClass = className.includes('text-sd-easy') || 
+                              className.includes('text-sd-medium') || 
+                              className.includes('text-sd-hard');
+    
+    const isDifficultyText = text === 'easy' || text === 'medium' || text === 'hard' || text === 'med.';
+    
+    // Must be a small element (not a large container)
+    const isSmallElement = text.length <= 10;
+    
+    // Additional check: element should be in a problem row context
+    const isInProblemContext = this.isInProblemRowContext(element);
+    
+    return hasDifficultyClass && isDifficultyText && isSmallElement && isInProblemContext;
+  }
+
+  isInProblemRowContext(element) {
+    // Check if element is within a problem row (table row or similar container)
+    let parent = element.parentElement;
+    let depth = 0;
+    
+    while (parent && depth < 10) {
+      const tagName = parent.tagName?.toLowerCase();
+      const className = parent.className || '';
+      
+      // Check for table row or similar container structures
+      if (tagName === 'tr' || 
+          tagName === 'td' ||
+          className.includes('row') ||
+          className.includes('problem') ||
+          parent.querySelector('a[href*="/problems/"]')) {
+        return true;
+      }
+      
+      parent = parent.parentElement;
+      depth++;
+    }
+    
+    return false;
+  }
+
+  hideByDifficultyText() {
+    // Find text nodes with difficulty text, but be more selective
     const walker = document.createTreeWalker(
       document.body,
       NodeFilter.SHOW_TEXT,
@@ -149,55 +221,52 @@ class DifficultyHider {
       false
     );
     
-    const textNodes = [];
+    const difficultyTextNodes = [];
     let node;
     while (node = walker.nextNode()) {
       const text = node.textContent.trim().toLowerCase();
-      if (text === 'easy' || text === 'medium' || text === 'hard') {
-        textNodes.push(node);
+      if (text === 'easy' || text === 'medium' || text === 'hard' || text === 'med.' ) {
+        difficultyTextNodes.push(node);
       }
     }
     
-    textNodes.forEach(textNode => {
+    difficultyTextNodes.forEach(textNode => {
       let element = textNode.parentElement;
-      // Go up the DOM to find the containing element
-      while (element && element !== document.body) {
-        if (this.shouldHideElement(element, textNode.textContent.trim())) {
-          element.style.display = 'none';
-          element.setAttribute('data-difficulty-hidden', 'true');
-          break;
-        }
-        element = element.parentElement;
+      
+      // Only hide if it's in a proper difficulty context
+      if (element && this.shouldHideDifficultyElement(element, textNode.textContent.trim())) {
+        element.style.display = 'none';
+        element.setAttribute('data-difficulty-hidden', 'true');
+        console.log('Hidden difficulty text element:', element.textContent);
       }
     });
   }
 
-  hideByColorClasses() {
-    const colorSelectors = [
-      // Current LeetCode difficulty classes (from your inspection)
-      '.text-sd-easy',
-      '.text-sd-medium', 
-      '.text-sd-hard',
-      // Legacy/backup classes
-      '.text-green-s', '.text-green-600', '.text-green-500',
-      '.text-yellow', '.text-yellow-600', '.text-yellow-500', '.text-orange-600',
-      '.text-red-s', '.text-red-600', '.text-red-500', '.text-pink-600',
-      // Tailwind variants
-      '.text-olive', '.text-orange', '.text-pink'
-    ];
+  shouldHideDifficultyElement(element, text) {
+    const tagName = element.tagName.toLowerCase();
+    const className = element.className || '';
+    const textContent = element.textContent.trim();
     
-    colorSelectors.forEach(selector => {
-      const elements = document.querySelectorAll(selector);
-      elements.forEach(el => {
-        el.style.display = 'none';
-        el.setAttribute('data-difficulty-hidden', 'true');
-        console.log('Hidden element with selector:', selector, el);
-      });
-    });
+    // Don't hide if it's a large container with lots of text
+    if (textContent.length > 15) return false;
+    
+    // Only hide if it has specific difficulty-related classes OR is in a table cell
+    const hasDifficultyClass = className.includes('text-sd-') || 
+                              className.includes('difficulty');
+    
+    const isTableCell = tagName === 'td' || tagName === 'th';
+    
+    const isSmallSpanOrDiv = (['span', 'div', 'p'].includes(tagName) && 
+                             textContent.toLowerCase() === text.toLowerCase());
+    
+    // Must be in a problem context
+    const isInProblemContext = this.isInProblemRowContext(element);
+    
+    return (hasDifficultyClass || isTableCell || isSmallSpanOrDiv) && isInProblemContext;
   }
 
   hideDifficultyColumns() {
-    // Hide table headers
+    // Hide table headers with "Difficulty" text
     const headers = document.querySelectorAll('th, [role="columnheader"]');
     headers.forEach(header => {
       const text = header.textContent.trim().toLowerCase();
@@ -222,91 +291,49 @@ class DifficultyHider {
     });
   }
 
-  hideWithAdvancedSelectors() {
-    // Specific LeetCode selectors based on your inspection
-    const leetcodeSelectors = [
-      // Current LeetCode structure - exact matches from your inspection
-      'p.text-sd-easy',
-      'p.text-sd-medium', 
-      'p.text-sd-hard',
-      'p[class*="text-sd-"]',
-      
-      // General patterns for the structure you found
-      'p[class*="text-[14px]"][class*="text-sd-"]',
-      'p.mx-0[class*="text-sd-"]',
-      
-      // Backup selectors
-      'td:nth-child(5)', // Often the 5th column is difficulty
-      'td:nth-child(4)', // Sometimes 4th column
-      '[role="cell"]:nth-child(5)',
-      '[role="cell"]:nth-child(4)',
-      
-      // Elements with difficulty-related attributes
-      'span[class*="difficulty"]',
-      'div[class*="difficulty"]',
-      'p[class*="difficulty"]',
-      
-      // Elements with specific text content patterns
-      'span[title="Easy"]', 'span[title="Medium"]', 'span[title="Hard"]',
-      'div[title="Easy"]', 'div[title="Medium"]', 'div[title="Hard"]',
-      'p[title="Easy"]', 'p[title="Medium"]', 'p[title="Hard"]'
-    ];
-    
-    leetcodeSelectors.forEach(selector => {
-      try {
-        const elements = document.querySelectorAll(selector);
-        elements.forEach(el => {
-          const text = el.textContent.trim().toLowerCase();
-          const className = el.className || '';
-          
-          // Hide if it contains sd- classes or difficulty text
-          if (className.includes('text-sd-') || 
-              text === 'easy' || text === 'medium' || text === 'hard' || text === 'med.') {
-            el.style.display = 'none';
-            el.setAttribute('data-difficulty-hidden', 'true');
-            console.log('Hidden advanced selector element:', selector, el);
-          }
-        });
-      } catch (e) {
-        // Selector might be invalid, continue
-      }
-    });
-  }
-
-  shouldHideElement(element, text) {
-    const tagName = element.tagName.toLowerCase();
-    const className = element.className || '';
-    const textContent = element.textContent.trim();
-    
-    // Don't hide if it's a large container with lots of text
-    if (textContent.length > 50) return false;
-    
-    // Hide if it's a span, div, or td with just the difficulty text
-    if (['span', 'div', 'td', 'th'].includes(tagName) && 
-        textContent.toLowerCase() === text.toLowerCase()) {
-      return true;
-    }
-    
-    // Hide if it has difficulty-related classes
-    if (className.includes('difficulty') || 
-        className.includes('text-green') || 
-        className.includes('text-yellow') || 
-        className.includes('text-red') ||
-        className.includes('text-orange') ||
-        className.includes('text-pink')) {
-      return true;
-    }
-    
-    return false;
-  }
-
   showDifficulties() {
+    // Remove hidden elements by our extension
     const hiddenElements = document.querySelectorAll('[data-difficulty-hidden="true"]');
     hiddenElements.forEach(el => {
       el.style.display = '';
+      el.style.visibility = '';
+      el.style.opacity = '';
+      el.style.height = '';
+      el.style.width = '';
+      el.style.margin = '';
+      el.style.padding = '';
       el.removeAttribute('data-difficulty-hidden');
     });
-    console.log('Difficulties shown');
+    
+    // Override CSS hiding by adding show classes
+    const cssHiddenElements = document.querySelectorAll('.text-sd-easy, .text-sd-medium, .text-sd-hard');
+    cssHiddenElements.forEach(el => {
+      el.classList.add('leetcode-difficulty-show');
+      // Also set inline styles to override CSS
+      el.style.display = 'block';
+      el.style.visibility = 'visible';
+      
+      // For inline elements like spans, use inline display
+      if (el.tagName.toLowerCase() === 'span') {
+        el.style.display = 'inline';
+      }
+    });
+    
+    // Also check for elements with partial classes
+    const partialElements = document.querySelectorAll('[class*="text-sd-easy"], [class*="text-sd-medium"], [class*="text-sd-hard"]');
+    partialElements.forEach(el => {
+      if (!el.classList.contains('leetcode-difficulty-show')) {
+        el.classList.add('leetcode-difficulty-show');
+        el.style.display = 'block';
+        el.style.visibility = 'visible';
+        
+        if (el.tagName.toLowerCase() === 'span') {
+          el.style.display = 'inline';
+        }
+      }
+    });
+    
+    console.log('Difficulties shown, count:', hiddenElements.length + cssHiddenElements.length);
   }
 
   setupObserver() {
@@ -323,8 +350,17 @@ class DifficultyHider {
           // Check if any added nodes contain difficulty-related content
           mutation.addedNodes.forEach(node => {
             if (node.nodeType === Node.ELEMENT_NODE) {
+              // Check for difficulty classes specifically
+              const className = node.className || '';
+              if (className.includes('text-sd-') || 
+                  node.querySelector && node.querySelector('[class*="text-sd-"]')) {
+                shouldHide = true;
+              }
+              
+              // Also check text content but be more specific
               const text = node.textContent?.toLowerCase() || '';
-              if (text.includes('easy') || text.includes('medium') || text.includes('hard')) {
+              if ((text.includes('easy') || text.includes('medium') || text.includes('hard')) || text.includes('med.')&&
+                  text.length < 50) { // Only short text snippets
                 shouldHide = true;
               }
             }
