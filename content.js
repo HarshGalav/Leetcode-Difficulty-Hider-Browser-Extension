@@ -16,11 +16,12 @@ class DifficultyHider {
       
       console.log('LeetCode Difficulty Hider initialized, enabled:', this.isEnabled);
       
-      // Wait for page to be ready
+      // IMMEDIATE execution - don't wait for DOM ready
+      this.start();
+      
+      // Also setup for DOM ready just in case
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => this.start());
-      } else {
-        this.start();
       }
       
       // Listen for messages from popup
@@ -42,31 +43,40 @@ class DifficultyHider {
   }
 
   start() {
-    // Immediately apply current state - no delay for first run
+    // IMMEDIATE application of state - no delays
     if (this.isEnabled) {
       this.hideDifficulties();
     } else {
       this.showDifficulties();
     }
     
-    // Also apply after a short delay for dynamic content
+    // Quick follow-up after a tiny delay for any late-loading content  
     setTimeout(() => {
       if (this.isEnabled) {
         this.hideDifficulties();
       } else {
         this.showDifficulties();
       }
-    }, 100);
+    }, 50);
+    
+    // Another check after DOM is fully ready
+    setTimeout(() => {
+      if (this.isEnabled) {
+        this.hideDifficulties();
+      } else {
+        this.showDifficulties();
+      }
+    }, 200);
     
     // Setup observer for dynamic content
     this.setupObserver();
     
-    // Periodic check for new content
+    // Periodic check for new content (reduced frequency)
     setInterval(() => {
       if (this.isEnabled) {
         this.hideDifficulties();
       }
-    }, 2000);
+    }, 3000);
   }
 
   toggle() {
@@ -176,7 +186,7 @@ class DifficultyHider {
                               className.includes('text-sd-medium') || 
                               className.includes('text-sd-hard');
     
-    const isDifficultyText = text === 'easy' || text === 'medium' || text === 'hard' || text === 'med.';
+    const isDifficultyText = text === 'easy' || text === 'medium' || text === 'hard'|| text === 'med.';
     
     // Must be a small element (not a large container)
     const isSmallElement = text.length <= 10;
@@ -225,7 +235,7 @@ class DifficultyHider {
     let node;
     while (node = walker.nextNode()) {
       const text = node.textContent.trim().toLowerCase();
-      if (text === 'easy' || text === 'medium' || text === 'hard' || text === 'med.' ) {
+      if (text === 'easy' || text === 'medium' || text === 'hard'|| text === 'med.') {
         difficultyTextNodes.push(node);
       }
     }
@@ -359,7 +369,7 @@ class DifficultyHider {
               
               // Also check text content but be more specific
               const text = node.textContent?.toLowerCase() || '';
-              if ((text.includes('easy') || text.includes('medium') || text.includes('hard')) || text.includes('med.')&&
+              if ((text.includes('easy') || text.includes('medium') || text.includes('hard') || text.includes('med.') ) &&
                   text.length < 50) { // Only short text snippets
                 shouldHide = true;
               }
@@ -385,14 +395,22 @@ class DifficultyHider {
   }
 }
 
-// Initialize the extension
+// Initialize the extension IMMEDIATELY
 console.log('LeetCode Difficulty Hider content script loaded');
 
-// Wait for page to be ready and initialize
+// Create instance immediately - don't wait for anything
+const difficultyHider = new DifficultyHider();
+
+// Also setup fallback initialization for different loading states
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
-    new DifficultyHider();
+    console.log('DOM loaded - reinitializing');
+    difficultyHider.start();
   });
-} else {
-  new DifficultyHider();
+} else if (document.readyState === 'interactive' || document.readyState === 'complete') {
+  // Document already loaded, ensure we run again
+  setTimeout(() => {
+    console.log('Document already loaded - reinitializing');
+    difficultyHider.start();
+  }, 10);
 }
